@@ -40,24 +40,29 @@ public class EmailVerificationService {
     }
 
     /**
-     * 인증코드 전송
+     * 인증 코드를 생성하여 이메일로 전송합니다.
      *
-     * @param email 사용자 이메일
+     * <p>이미 가입된 이메일이면 전송하지 않고 예외를 던지며,
+     * 발급된 코드는 10분 뒤 만료되도록 저장합니다. 전송 실패 시 저장한 코드도 롤백(삭제)합니다.</p>
+     *
+     * @param email 수신자 이메일
+     * @throws edu.kangwon.university.taxicarpool.member.exception.DuplicatedEmailException
+     *         이미 가입된 이메일인 경우
+     * @throws edu.kangwon.university.taxicarpool.email.exception.EmailSendFailedException
+     *         메일 전송에 실패한 경우
+     * @throws java.lang.Exception 메일 전송 과정에서 발생할 수 있는 일반 예외 전파
      */
     public void sendCode(String email) throws Exception {
 
-        // 이미 가입된 사용자가 이메일을 사용하고 있으면 예외 처리
         if (memberRepository.existsByEmail(email)) {
             throw new DuplicatedEmailException("이미 사용 중인 이메일입니다: " + email);
         }
 
         String code = generateCode();
 
-        // 인증 코드가 10분 후 만료되게 설정
         EmailVerificationEntity entity = new EmailVerificationEntity(email, code,
             LocalDateTime.now().plusMinutes(10));
 
-        // 이미 인증코드를 받은 이력이 있으면 해당 데이터 삭제
         emailVerificationRepository.findByEmail(email).ifPresent(
             emailVerificationRepository::delete);
 
@@ -68,45 +73,50 @@ public class EmailVerificationService {
         } catch (Exception e) {
             // 이메일 전송 실패 시 저장된 인증 코드 삭제
             emailVerificationRepository.delete(entity);
-            // 이메일 전송 실패시 예외 처리
             throw new EmailSendFailedException("이메일 전송에 실패하였습니다.");
         }
 
     }
 
     /**
-     * 인증코드 검증
+     * 사용자가 입력한 인증 코드를 검증합니다.
      *
-     * @param email 사용자 이메일
-     * @param code  사용자가 입력한 코드
+     * <p>코드가 일치하고 만료되지 않았다면 해당 이메일을 인증됨으로 표시합니다.</p>
+     *
+     * @param email 검증 대상 이메일
+     * @param code  사용자가 입력한 6자리 코드
+     * @throws edu.kangwon.university.taxicarpool.email.exception.EmailVerificationNotFoundException
+     *         해당 이메일의 인증 정보가 존재하지 않는 경우
+     * @throws edu.kangwon.university.taxicarpool.email.exception.InvalidVerificationCodeException
+     *         인증 코드가 일치하지 않는 경우
+     * @throws edu.kangwon.university.taxicarpool.email.exception.ExpiredVerificationCodeException
+     *         인증 코드가 만료된 경우
      */
     public void verifyCode(String email, String code) {
 
-        // 1. DB에서 해당 email 조회
         EmailVerificationEntity entity = emailVerificationRepository.findByEmail(email)
             .orElseThrow(() -> new EmailVerificationNotFoundException("인증 정보를 찾을 수 없습니다."));
 
-        // 2. 코드가 동일한지 체크
         if (!entity.getVerificationCode().equals(code)) {
             throw new InvalidVerificationCodeException("인증 코드가 일치하지 않습니다.");
         }
 
-        // 3. 코드가 만료되었는지 체크
         if (entity.isExpired()) {
             throw new ExpiredVerificationCodeException("인증 코드가 만료되었습니다.");
         }
 
-        // 4. 인증되었다고 저장
         entity.setVerified(true);
         emailVerificationRepository.save(entity);
 
     }
 
     /**
-     * 이메일이 인증되었는지 여부 체크
+     * 이메일이 인증 완료 상태인지 확인합니다.
      *
-     * @param email 확인할 이메일
-     * @return 이메일이 인증되었는지 여부
+     * @param email 조회할 이메일
+     * @return true: 인증됨, false: 미인증
+     * @throws edu.kangwon.university.taxicarpool.email.exception.EmailVerificationNotFoundException
+     *         해당 이메일의 인증 정보가 존재하지 않는 경우
      */
     public boolean isEmailVerified(String email) {
         EmailVerificationEntity entity = emailVerificationRepository.findByEmail(email)
@@ -114,12 +124,29 @@ public class EmailVerificationService {
         return entity.isVerified();
     }
 
+    /**
+     * 6자리 난수 인증 코드를 생성합니다.
+     *
+     * <p>{@link java.security.SecureRandom} 기반으로 100000~999999 범위를 생성합니다.</p>
+     *
+     * @return 6자리 숫자 문자열 코드
+     */
     private String generateCode() {
         Random random = new SecureRandom();
         int num = random.nextInt(900000) + 100000; // 100000 ~ 999999
         return String.valueOf(num);
     }
 
+    /**
+     * 실제 이메일을 전송합니다.
+     *
+     * <p>발신자 주소/이름은 설정값을 사용하며, 제목은 "인증코드 안내",
+     * 본문은 "인증코드: {code}" 형식으로 전송합니다.</p>
+     *
+     * @param to 수신자 이메일
+     * @param code 전송할 인증 코드
+     * @throws java.lang.Exception 메일 메시지 구성/전송 과정에서 발생한 예외
+     */
     private void sendEmail(String to, String code) throws Exception {
         MimeMessage message = javaMailSender.createMimeMessage();
         MimeMessageHelper helper = new MimeMessageHelper(message, "UTF-8");

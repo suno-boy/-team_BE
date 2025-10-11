@@ -4,9 +4,16 @@ import edu.kangwon.university.taxicarpool.member.Gender;
 import edu.kangwon.university.taxicarpool.member.validation.EmailValid;
 import edu.kangwon.university.taxicarpool.member.validation.NicknameValid;
 import edu.kangwon.university.taxicarpool.member.validation.PasswordValid;
+import edu.kangwon.university.taxicarpool.profanity.NoProfanity;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class MemberCreateDTO {
 
     @NotBlank(message = "이메일은 필수 입력 항목입니다.")
@@ -19,41 +26,9 @@ public class MemberCreateDTO {
 
     @NotBlank(message = "닉네임은 필수 입력 항목입니다.")
     @NicknameValid
+    @NoProfanity(message = "닉네임에 비속어가 포함되어 있습니다.")
     private String nickname;
 
     @NotNull(message = "성별은 필수 선택 항목입니다.")
     private Gender gender;
-
-    public String getEmail() {
-        return email;
-    }
-
-    public void setEmail(String email) {
-        this.email = email;
-    }
-
-    public String getPassword() {
-        return password;
-    }
-
-    public void setPassword(String password) {
-        this.password = password;
-    }
-
-    public String getNickname() {
-        return nickname;
-    }
-
-    public void setNickname(String nickname) {
-        this.nickname = nickname;
-    }
-
-    public Gender getGender() {
-        return gender;
-    }
-
-    public void setGender(Gender gender) {
-        this.gender = gender;
-    }
 }
-

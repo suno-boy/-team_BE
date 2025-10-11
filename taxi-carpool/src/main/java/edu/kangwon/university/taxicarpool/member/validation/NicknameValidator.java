@@ -11,6 +11,9 @@ public class NicknameValidator implements ConstraintValidator<NicknameValid, Str
 
     @Override
     public boolean isValid(String value, ConstraintValidatorContext context) {
-        return value != null && NICKNAME_PATTERN.matcher(value).matches();
+        if (value == null || value.trim().isEmpty()) {
+            return true;
+        }
+        return NICKNAME_PATTERN.matcher(value).matches();
     }
 }

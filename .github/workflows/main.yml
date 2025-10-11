@@ -1,0 +1,107 @@
+name: taxiCarpool-github-actions
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: {}
+
+jobs: 
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      SPRING_DATASOURCE_URL:      ${{ secrets.SPRING_DATASOURCE_URL }}
+      SPRING_DATASOURCE_USERNAME: ${{ secrets.SPRING_DATASOURCE_USERNAME }}
+      SPRING_DATASOURCE_PASSWORD: ${{ secrets.SPRING_DATASOURCE_PASSWORD }}
+      EMAIL_VERIFICATION_GOOGLE_ID:      ${{ secrets.EMAIL_VERIFICATION_GOOGLE_ID }}
+      EMAIL_VERIFICATION_GOOGLE_PW:      ${{ secrets.EMAIL_VERIFICATION_GOOGLE_PW }}
+      EMAIL_VERIFICATION_GOOGLE_ADDRESS: ${{ secrets.EMAIL_VERIFICATION_GOOGLE_ADDRESS }}
+      KAKAO_APP_REST_KEY:                ${{ secrets.KAKAO_APP_REST_KEY }}
+      JWT_SECRET:                        ${{ secrets.JWT_SECRET }}
+      APP_PASSWORD_RESET_BASE_URL:       ${{ secrets.APP_PASSWORD_RESET_BASE_URL }}
+      KAKAOMOBILITY_API_KEY:             ${{ secrets.KAKAOMOBILITY_API_KEY }}
+      FIREBASE_SERVICE_ACCOUNT_B64:      ${{ secrets.FIREBASE_SERVICE_ACCOUNT_B64 }}
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v2
+
+    - name: Set up JDK 21
+      uses: actions/setup-java@v3
+      with:
+        distribution: 'temurin'
+        java-version: '21'
+
+    - name: Set up SSH Key
+      run: |
+        echo "${{ secrets.EC2_KEY }}" > key.pem
+        chmod 600 key.pem
+      working-directory: ./taxi-carpool
+
+    - name: Add EC2 Host to Known Hosts
+      run: |
+        mkdir -p ~/.ssh
+        ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+
+    - name: Grant execute permission to Gradle wrapper
+      run: chmod +x ./gradlew
+      working-directory: ./taxi-carpool
+
+    - name: Build
+      run: ./gradlew clean build
+      working-directory: ./taxi-carpool
+
+    - name: Make Directories on EC2
+      run: ssh -i key.pem ec2-user@${{ secrets.EC2_HOST }} "mkdir -p /home/ec2-user/deploys /home/ec2-user/logs"
+      working-directory: ./taxi-carpool
+
+    - name: Upload JAR to EC2
+      run: scp -i key.pem build/libs/taxi-carpool-0.0.1-SNAPSHOT.jar ec2-user@${{ secrets.EC2_HOST }}:/home/ec2-user/deploys/taxi-carpool-0.0.1-SNAPSHOT.jar
+      working-directory: ./taxi-carpool
+
+    - name: Start Spring App on EC2
+      run: |
+        ssh -i key.pem ec2-user@${{ secrets.EC2_HOST }} << 'EOF'
+        set -euo pipefail
+
+        # 현재 떠 있는 모든 Java 프로세스 PID 수집
+        PIDS=$(ps -ef | grep java | grep -v grep | awk '{print $2}') || true
+    
+        if [ -n "$PIDS" ]; then
+          echo "Stopping Java processes: $PIDS"
+          # 우선 SIGTERM 으로 graceful shutdown 시도
+          for PID in $PIDS; do
+            kill -15 $PID || true
+          done
+    
+          # 잠시 대기
+          sleep 5
+    
+          # 여전히 살아있는 프로세스는 SIGKILL
+          for PID in $PIDS; do
+            if kill -0 $PID 2>/dev/null; then
+              echo "Force killing: $PID"
+              kill -9 $PID || true
+            fi
+          done
+        else
+          echo "No Java process found"
+        fi
+    
+        export SPRING_DATASOURCE_URL='${{ secrets.SPRING_DATASOURCE_URL }}'
+        export SPRING_DATASOURCE_USERNAME='${{ secrets.SPRING_DATASOURCE_USERNAME }}'
+        export SPRING_DATASOURCE_PASSWORD='${{ secrets.SPRING_DATASOURCE_PASSWORD }}'
+        export EMAIL_VERIFICATION_GOOGLE_ID='${{ secrets.EMAIL_VERIFICATION_GOOGLE_ID }}'
+        export EMAIL_VERIFICATION_GOOGLE_PW='${{ secrets.EMAIL_VERIFICATION_GOOGLE_PW }}'
+        export EMAIL_VERIFICATION_GOOGLE_ADDRESS='${{ secrets.EMAIL_VERIFICATION_GOOGLE_ADDRESS }}'
+        export KAKAO_APP_REST_KEY='${{ secrets.KAKAO_APP_REST_KEY }}'
+        export JWT_SECRET='${{ secrets.JWT_SECRET }}'
+        export APP_PASSWORD_RESET_BASE_URL='${{ secrets.APP_PASSWORD_RESET_BASE_URL }}'
+        export KAKAOMOBILITY_API_KEY='${{ secrets.KAKAOMOBILITY_API_KEY }}'
+        export FIREBASE_SERVICE_ACCOUNT_B64='${{ secrets.FIREBASE_SERVICE_ACCOUNT_B64 }}'
+        
+        nohup java -Dspring.profiles.active=prod \
+          -jar /home/ec2-user/deploys/taxi-carpool-0.0.1-SNAPSHOT.jar \
+          > /home/ec2-user/logs/log.txt 2>&1 &
+        EOF
+      working-directory: ./taxi-carpool

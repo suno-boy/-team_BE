@@ -1,29 +1,19 @@
 package edu.kangwon.university.taxicarpool.member;
 
+import edu.kangwon.university.taxicarpool.chatting.MessageEntity;
 import edu.kangwon.university.taxicarpool.party.PartyEntity;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
+import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class MemberEntity {
-
-    public MemberEntity(String email, String password, String nickname, Gender gender) {
-        this.email = email;
-        this.password = password;
-        this.nickname = nickname;
-        this.gender = gender;
-    }
-
-    public MemberEntity() {
-    }
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -44,48 +34,51 @@ public class MemberEntity {
     @Enumerated(EnumType.STRING)
     private Gender gender;
 
-    @ManyToOne
-    @JoinColumn(name = "party_id")
-    private PartyEntity partyEntity;
+    @ManyToMany(mappedBy = "memberEntities")
+    private List<PartyEntity> parties = new ArrayList<>();
 
-    public Long getId() {
-        return id;
-    }
+    @OneToMany(mappedBy = "sender")
+    private List<MessageEntity> sentMessages = new ArrayList<>();
 
-    public void setId(Long id) {
-        this.id = id;
-    }
+    @Column(name = "total_saved_amount", nullable = false)
+    private long totalSavedAmount = 0L;
 
-    public String getEmail() {
-        return email;
-    }
+    @Column(nullable = false)
+    private int tokenVersion = 0;
 
-    public void setEmail(String email) {
+    public MemberEntity(String email, String password, String nickname, Gender gender) {
         this.email = email;
-    }
-
-    public String getPassword() {
-        return password;
-    }
-
-    public void setPassword(String password) {
         this.password = password;
+        this.nickname = nickname;
+        this.gender = gender;
     }
 
-    public String getNickname() {
-        return nickname;
+    public void setPassword(@NotNull String password) {
+        this.password = password;
     }
 
     public void setNickname(String nickname) {
         this.nickname = nickname;
     }
 
-    public Gender getGender() {
-        return gender;
+    public void setTokenVersion(int tokenVersion) {
+        this.tokenVersion = tokenVersion;
     }
 
-    public void setGender(Gender gender) {
+    public void setEmail(@NotNull String email) {
+        this.email = email;
+    }
+
+    public void setGender(
+        @NotNull Gender gender) {
         this.gender = gender;
     }
 
+    /** 절감 금액을 누적하는 편의 메서드 */
+    public void addToTotalSavedAmount(long amountToAdd) {
+        if (amountToAdd < 0) {
+            throw new IllegalArgumentException("누적 절감 금액은 음수가 될 수 없습니다.");
+        }
+        this.totalSavedAmount += amountToAdd;
+    }
 }
