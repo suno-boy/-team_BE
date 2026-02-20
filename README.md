@@ -125,7 +125,7 @@
 ### 🖥️ Frontend
 - **Language**: TypeScript
 - **Framework**: React Native
-- **Deployment**: [공란]
+- **Deployment**:
 
 ### ⚙️ Backend
 - **Language**: Java
