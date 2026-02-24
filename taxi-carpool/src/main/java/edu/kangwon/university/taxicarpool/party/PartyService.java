@@ -321,60 +321,22 @@ public class PartyService {
      * @throws edu.kangwon.university.taxicarpool.party.partyException.PartyFullException
      *         파티 정원이 가득 찬 경우
      */
-    @Transactional(propagation = Propagation.NEVER)
+    @Transactional
     public PartyResponseDTO joinParty(Long partyId, Long memberId) {
 
-        final String lockKey = "party:join:" + partyId;
-        RLock lock = redissonClient.getLock(lockKey);
+        PartyEntity party = partyRepository.findByIdAndIsDeletedFalse(partyId)
+            .orElseThrow(() -> new PartyNotFoundException("해당 파티가 존재하지 않습니다."));
+        MemberEntity member = memberRepository.findById(memberId)
+            .orElseThrow(() -> new MemberNotFoundException("해당 멤버가 존재하지 않습니다."));
 
-        try {
-            boolean isLocked = lock.tryLock(0, 40, TimeUnit.SECONDS);
+        party.join(member);
 
-            if (!isLocked) {
-                throw new PartyFullException("현재 이 방에 참여하려는 요청이 너무 많습니다. 잠시 후 다시 시도해주세요.");
-            }
+        PartyEntity saved = partyRepository.save(party);
 
-            TransactionTemplate txTemplate = new TransactionTemplate(transactionManager);
+        chattingService.createSystemMessage(saved, member, MessageType.ENTER);
+        sendJoinPushNotification(saved, member, memberId);
 
-            PartyResponseDTO result = txTemplate.execute(status -> {
-                PartyEntity party = partyRepository.findByIdAndIsDeletedFalse(partyId)
-                    .orElseThrow(() -> new PartyNotFoundException("해당 파티가 존재하지 않습니다."));
-                MemberEntity member = memberRepository.findById(memberId)
-                    .orElseThrow(() -> new MemberNotFoundException("해당 멤버가 존재하지 않습니다."));
-
-                party.join(member);
-
-                PartyEntity saved = partyRepository.save(party);
-                chattingService.createSystemMessage(saved, member, MessageType.ENTER);
-
-                List<Long> targetIds = saved.getMemberEntities().stream()
-                    .map(MemberEntity::getId)
-                    .filter(id -> !id.equals(memberId))
-                    .toList();
-
-                if (!targetIds.isEmpty()) {
-                    PushMessageDTO msg = PartyUtil.createPartyPushMessage(
-                        saved,
-                        member.getNickname() + "님이 파티에 참여했습니다.",
-                        "PARTY_ENTER",
-                        Map.of("enterMemberId", String.valueOf(memberId))
-                    );
-                    fcmPushService.sendPushToUsers(targetIds, msg);
-                }
-
-                return partyMapper.convertToResponseDTO(saved);
-            });
-
-            return result;
-
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException("락을 기다리는 중 인터럽트가 발생했습니다.", e);
-        } finally {
-            if (lock.isLocked() && lock.isHeldByCurrentThread()) {
-                lock.unlock();
-            }
-        }
+        return partyMapper.convertToResponseDTO(saved);
     }
 
     /**
@@ -521,5 +483,21 @@ public class PartyService {
         return result;
     }
 
+    private void sendJoinPushNotification(PartyEntity saved, MemberEntity member, Long memberId) {
+        List<Long> targetIds = saved.getMemberEntities().stream()
+            .map(MemberEntity::getId)
+            .filter(id -> !id.equals(memberId))
+            .toList();
+
+        if (!targetIds.isEmpty()) {
+            PushMessageDTO msg = PartyUtil.createPartyPushMessage(
+                saved,
+                member.getNickname() + "님이 파티에 참여했습니다.",
+                "PARTY_ENTER",
+                Map.of("enterMemberId", String.valueOf(memberId))
+            );
+            fcmPushService.sendPushToUsers(targetIds, msg);
+        }
+    }
 
 }

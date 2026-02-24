@@ -37,10 +37,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class PartyController {
 
     private final PartyService partyService;
+    private final PartyFacade partyFacade;
 
     @Autowired
-    public PartyController(PartyService partyService) {
+    public PartyController(PartyService partyService, PartyFacade partyFacade) {
         this.partyService = partyService;
+        this.partyFacade = partyFacade;
     }
 
     @Operation(summary = "파티 조회", description = "ID로 특정 파티 정보를 가져옵니다.")
@@ -128,7 +130,7 @@ public class PartyController {
     ) {
         Long memberId = (Long) SecurityContextHolder
             .getContext().getAuthentication().getPrincipal();
-        return ResponseEntity.ok(partyService.joinParty(partyId, memberId));
+        return ResponseEntity.ok(partyFacade.joinParty(partyId, memberId));
     }
 
     @Operation(summary = "파티 퇴장", description = "멤버를 카풀방에서 퇴장시킵니다.")
