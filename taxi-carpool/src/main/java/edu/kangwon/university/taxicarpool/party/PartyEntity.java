@@ -2,11 +2,13 @@ package edu.kangwon.university.taxicarpool.party;
 
 import edu.kangwon.university.taxicarpool.chatting.MessageEntity;
 import edu.kangwon.university.taxicarpool.map.MapPlace;
+import edu.kangwon.university.taxicarpool.member.Gender;
 import edu.kangwon.university.taxicarpool.member.MemberEntity;
 import edu.kangwon.university.taxicarpool.party.partyException.MemberAlreadyInPartyException;
 import edu.kangwon.university.taxicarpool.party.partyException.MemberNotInPartyException;
 import edu.kangwon.university.taxicarpool.party.partyException.PartyAlreadyDeletedException;
 import edu.kangwon.university.taxicarpool.party.partyException.PartyFullException;
+import edu.kangwon.university.taxicarpool.party.partyException.PartyGenderMismatchException;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -193,7 +195,22 @@ public class PartyEntity {
             throw new PartyFullException("현재 파티의 참여 인원수가 가득찼습니다.");
         }
 
+        if (this.options != null && this.options.isSameGenderOnly()) {
+            if (!this.memberEntities.isEmpty()) {
+                MemberEntity hostMember = this.memberEntities.stream()
+                    .filter(m -> m.getId().equals(this.hostMemberId))
+                    .findFirst()
+                    .orElseThrow(() -> new MemberNotInPartyException("데이터 오류: 파티 내에 호스트 정보가 없습니다."));
+
+                if (hostMember.getGender() != member.getGender()) {
+                    String genderText = (hostMember.getGender() == Gender.MALE) ? "남성" : "여성";
+                    throw new PartyGenderMismatchException(genderText + "만 참여할 수 있는 카풀방입니다.");
+                }
+            }
+        }
+
         this.memberEntities.add(member);
+        member.getParties().add(this);
         this.currentParticipantCount = this.memberEntities.size();
     }
 

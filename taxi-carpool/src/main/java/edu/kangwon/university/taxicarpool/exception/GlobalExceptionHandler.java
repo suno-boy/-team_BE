@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import edu.kangwon.university.taxicarpool.auth.authException.AuthenticationFailedException;
 import edu.kangwon.university.taxicarpool.auth.authException.TokenExpiredException;
 import edu.kangwon.university.taxicarpool.auth.authException.TokenInvalidException;
+import edu.kangwon.university.taxicarpool.chatting.exception.InvalidMessageTypeException;
 import edu.kangwon.university.taxicarpool.email.exception.EmailSendFailedException;
 import edu.kangwon.university.taxicarpool.email.exception.EmailVerificationNotFoundException;
 import edu.kangwon.university.taxicarpool.email.exception.ExpiredVerificationCodeException;
@@ -18,6 +19,7 @@ import edu.kangwon.university.taxicarpool.party.partyException.MemberAlreadyInPa
 import edu.kangwon.university.taxicarpool.party.partyException.MemberNotInPartyException;
 import edu.kangwon.university.taxicarpool.party.partyException.PartyAlreadyDeletedException;
 import edu.kangwon.university.taxicarpool.party.partyException.PartyFullException;
+import edu.kangwon.university.taxicarpool.party.partyException.PartyGenderMismatchException;
 import edu.kangwon.university.taxicarpool.party.partyException.PartyGetCustomException;
 import edu.kangwon.university.taxicarpool.party.partyException.PartyInvalidMaxParticipantException;
 import edu.kangwon.university.taxicarpool.party.partyException.PartyNotFoundException;
@@ -305,6 +307,54 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(SavingsAlreadyCalculatedException.class)
     public ResponseEntity<ErrorResponseDTO> handleSavingsAlreadyCalculatedException (
         SavingsAlreadyCalculatedException ex, HttpServletRequest request) {
+        ErrorResponseDTO errorResponse = new ErrorResponseDTO(
+            HttpStatus.BAD_REQUEST.value(),
+            ex.getMessage(),
+            request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+    }
+
+    @ExceptionHandler(PartyGenderMismatchException.class)
+    public ResponseEntity<ErrorResponseDTO> handlePartyGenderMismatchException(
+        edu.kangwon.university.taxicarpool.party.partyException.PartyGenderMismatchException ex, HttpServletRequest request) {
+
+        ErrorResponseDTO errorResponse = new ErrorResponseDTO(
+            HttpStatus.FORBIDDEN.value(),
+            ex.getMessage(),
+            request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(errorResponse);
+    }
+
+    @ExceptionHandler(edu.kangwon.university.taxicarpool.party.partyException.PartyServiceUnavailableException.class)
+    public ResponseEntity<ErrorResponseDTO> handleServiceUnavailable(
+        edu.kangwon.university.taxicarpool.party.partyException.PartyServiceUnavailableException ex, HttpServletRequest request) {
+
+        ErrorResponseDTO errorResponse = new ErrorResponseDTO(
+            HttpStatus.SERVICE_UNAVAILABLE.value(),
+            ex.getMessage(),
+            request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(errorResponse);
+    }
+
+    @ExceptionHandler(edu.kangwon.university.taxicarpool.party.partyException.PartyLockInterruptedException.class)
+    public ResponseEntity<ErrorResponseDTO> handlePartyLockInterruptedException(
+        edu.kangwon.university.taxicarpool.party.partyException.PartyLockInterruptedException ex, HttpServletRequest request) {
+
+        ErrorResponseDTO errorResponse = new ErrorResponseDTO(
+            HttpStatus.SERVICE_UNAVAILABLE.value(),
+            ex.getMessage(),
+            request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(errorResponse);
+    }
+
+    @ExceptionHandler(InvalidMessageTypeException.class)
+    public ResponseEntity<ErrorResponseDTO> handleInvalidMessageTypeException(
+        InvalidMessageTypeException ex,
+        HttpServletRequest request) {
         ErrorResponseDTO errorResponse = new ErrorResponseDTO(
             HttpStatus.BAD_REQUEST.value(),
             ex.getMessage(),

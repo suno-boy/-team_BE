@@ -3,6 +3,7 @@ package edu.kangwon.university.taxicarpool.chatting;
 import edu.kangwon.university.taxicarpool.chatting.dto.MessageResponseDTO;
 import edu.kangwon.university.taxicarpool.chatting.dto.NotificationResponseDTO;
 import edu.kangwon.university.taxicarpool.chatting.dto.ParticipantResponseDTO;
+import edu.kangwon.university.taxicarpool.chatting.exception.InvalidMessageTypeException;
 import edu.kangwon.university.taxicarpool.fcm.FcmPushService;
 import edu.kangwon.university.taxicarpool.fcm.dto.PushMessageDTO;
 import edu.kangwon.university.taxicarpool.member.MemberEntity;
@@ -62,7 +63,7 @@ public class ChattingService {
         MessageType type) {
         // PartyService에서 Party, Member 존재여부 및 참여여부 검증이 이루어지므로 여기서는 검증하지 않음
         if (type == MessageType.TALK) {
-            throw new IllegalArgumentException("시스템 메시지는 TALK 타입을 가질 수 없습니다.");
+            throw new InvalidMessageTypeException("시스템 메시지는 TALK 타입을 가질 수 없습니다.");
         }
 
         String displayType = type.getDisplayName();
