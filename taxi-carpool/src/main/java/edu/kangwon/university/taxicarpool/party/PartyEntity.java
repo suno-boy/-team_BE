@@ -38,6 +38,9 @@ public class PartyEntity {
     @Column(name = "name")
     private String name;
 
+    @Version
+    private Long version;
+
     @Column(name = "is_deleted")
     private boolean isDeleted;
 
